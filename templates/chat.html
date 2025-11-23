@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FinChat Pro</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="page-wrapper">
+
+        <!-- HEADER -->
+        <header class="hero">
+            <div class="logo-row">
+                <div class="logo-icon">📄</div>
+                <div class="logo-text">FinChat Pro</div>
+            </div>
+            <p class="hero-subtitle">Your Intelligent Financial Document Assistant</p>
+        </header>
+
+        <!-- DATA CONTROLS (CSV + URL) -->
+        <section class="data-controls">
+            <div class="control-block">
+                <label class="control-label">📊 Upload CSV</label>
+                <div class="control-row">
+                    <input type="file" id="csv-file" accept=".csv" />
+                    <button id="upload-csv-btn" class="small-btn">Upload</button>
+                </div>
+            </div>
+
+            <div class="control-block">
+                <label class="control-label">🌐 Crawl Website</label>
+                <div class="control-row">
+                    <input type="text" id="url-input" placeholder="https://example.com" />
+                    <button id="crawl-url-btn" class="small-btn">Crawl</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- CHAT AREA -->
+        <main class="main-section">
+            <div id="chat-box"></div>
+
+            <!-- Typing indicator -->
+            <div id="typing-indicator" class="typing hidden">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="footer-section">
+            <div class="chat-input-bar">
+                <input type="text" id="user-input" placeholder="Ask about your financial documents…" autocomplete="off" />
+                <button id="send-btn" class="send-button" type="button">
+                    <span class="send-icon">➤</span>
+                </button>
+            </div>
+        </footer>
+
+    </div>
+
+<script>
+/* ---------- Chat sending ---------- */
+$('#send-btn').on('click', sendMessage);
+
+$('#user-input').on('keydown', function (e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+// --- Auto bullet formatting ---
+// Turns "- item - item2 - item3" into each bullet on new line
+function autoFormatBullets(inputText) {
+    // Regex: split when "- " appears but not the first one
+    return inputText
+        .replace(/-\s+/g, "\n- ")   // make sure each "- " starts on a new line
+        .trim();
+}
+
+
+function sendMessage() {
+    let msg = $('#user-input').val().trim();
+    msg = autoFormatBullets(msg);   // <<< NEW
+
+    if (!msg) return;
+
+    // USER MESSAGE
+    $('#chat-box').append(`
+        <div class="msg-row left">
+            <div class="avatar user-avatar">🧑</div>
+            <div class="bubble user-bubble">${$('<div>').text(msg).html()}</div>
+        </div>
+    `);
+
+    $('#user-input').val('');
+    scrollToBottom();
+
+    // Show typing animation
+    $('#typing-indicator').removeClass('hidden');
+
+    // Bot response via Flask
+    $.post('/get', { msg: msg })
+        .done(function (data) {
+            $('#typing-indicator').addClass('hidden');
+
+            $('#chat-box').append(`
+                <div class="msg-row right">
+                    <div class="avatar bot-avatar">🤖</div>
+                    <div class="bubble bot-bubble">${data.replace(/\n/g, "<br>")}</div>
+
+                </div>
+            `);
+
+            scrollToBottom();
+        })
+        .fail(function () {
+            $('#typing-indicator').addClass('hidden');
+
+            $('#chat-box').append(`
+                <div class="msg-row right">
+                    <div class="avatar bot-avatar">🤖</div>
+                    <div class="bubble bot-bubble">Sorry, something went wrong.</div>
+                </div>
+            `);
+
+            scrollToBottom();
+        });
+}
+
+function scrollToBottom() {
+    const box = document.getElementById('chat-box');
+    box.scrollTop = box.scrollHeight;
+}
+
+/* ---------- CSV upload ---------- */
+$('#upload-csv-btn').on('click', function () {
+    const fileInput = $('#csv-file')[0];
+    if (!fileInput.files || !fileInput.files[0]) {
+        alert('Please select a CSV file first.');
+        return;
+    }
+    const file = fileInput.files[0];
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    $.ajax({
+        url: '/ingest_csv',
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false
+    }).done(function (res) {
+        if (res.status === 'ok') {
+            // Show a bot message with preview table inside
+            $('#chat-box').append(`
+                <div class="msg-row right">
+                    <div class="avatar bot-avatar">🤖</div>
+                    <div class="bubble bot-bubble">
+                        <div><strong>${res.message}</strong></div>
+                        <div style="margin-top:8px;">${res.preview_html}</div>
+                    </div>
+                </div>
+            `);
+            scrollToBottom();
+        } else {
+            alert(res.message || 'Error uploading CSV.');
+        }
+    }).fail(function () {
+        alert('Error uploading CSV.');
+    });
+});
+
+/* ---------- Website crawling ---------- */
+$('#crawl-url-btn').on('click', function () {
+    const url = $('#url-input').val().trim();
+    if (!url) {
+        alert('Please enter a URL.');
+        return;
+    }
+
+    // Add a temporary bubble showing crawling status
+    const crawlingId = "crawl-" + Date.now();
+
+    $('#chat-box').append(`
+        <div class="msg-row right" id="${crawlingId}">
+            <div class="avatar bot-avatar">🤖</div>
+            <div class="bubble bot-bubble">
+                <strong>🔍 Crawling website…</strong><br>
+                <span class="loader"></span>
+                <div style="margin-top:6px;">Extracting financial data from:<br>${$('<div>').text(url).html()}</div>
+            </div>
+        </div>
+    `);
+    scrollToBottom();
+
+    const formData = new FormData();
+    formData.append('url', url);
+
+    $.ajax({
+        url: '/ingest_url',
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false
+    }).done(function (res) {
+        // Replace the temporary bubble with the final result
+        $(`#${crawlingId}`).replaceWith(`
+            <div class="msg-row right">
+                <div class="avatar bot-avatar">🤖</div>
+                <div class="bubble bot-bubble">
+                    <strong>${res.message}</strong>
+                    <div style="margin-top:8px;">
+                        <code>${$('<div>').text(res.snippet || '').html()}</code>
+                    </div>
+                </div>
+            </div>
+        `);
+        scrollToBottom();
+    }).fail(function () {
+        // Show failure message
+        $(`#${crawlingId}`).replaceWith(`
+            <div class="msg-row right">
+                <div class="avatar bot-avatar">🤖</div>
+                <div class="bubble bot-bubble">
+                    ❌ <b>Error:</b> Unable to crawl website. Please try another URL.
+                </div>
+            </div>
+        `);
+        scrollToBottom();
+    });
+});
+
+</script>
+
+</body>
+</html>

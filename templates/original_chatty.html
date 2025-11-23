@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FinChat Pro</title>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <!-- jQuery for AJAX -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="page-wrapper">
+
+        <!-- HEADER -->
+        <header class="hero">
+            <div class="logo-row">
+                <div class="logo-icon">📄</div>
+                <div class="logo-text">FinChat Pro</div>
+            </div>
+            <p class="hero-subtitle">Your Intelligent Financial Document Assistant</p>
+        </header>
+
+        <!-- SECTION TITLE + CHAT AREA -->
+        <main class="main-section">
+            <div class="chat-heading">
+                <span class="chat-heading-icon">💬</span>
+                <span class="chat-heading-text">Chat with Your Financial Documents</span>
+            </div>
+
+            <div class="divider-line"></div>
+
+            <!-- Chat messages will appear here -->
+            <div id="chat-box"></div>
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="footer-section">
+            <div class="footer-powered">
+                ⚙️ Powered by GLOBEFT AI & LangChain | Financial Document Intelligence
+            </div>
+
+            <!-- Input bar -->
+            <div class="chat-input-bar">
+                <input
+                    type="text"
+                    id="user-input"
+                    placeholder="Ask about your financial documents..."
+                    autocomplete="off"
+                />
+                <button id="send-btn" class="send-button" type="button">
+                    <span class="send-icon">➤</span>
+                </button>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- JS: handle click + Enter, call /get, show response -->
+    <script>
+        // send on arrow click
+        $('#send-btn').on('click', function () {
+            sendMessage();
+        });
+
+        // send on Enter key
+        $('#user-input').on('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();  // stop form submit / new line
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            const msg = $('#user-input').val().trim();
+            if (!msg) return;
+
+            // show user message in chat box
+            $('#chat-box').append(
+                '<div class="user-msg"><strong>You:</strong> ' + $('<div>').text(msg).html() + '</div>'
+            );
+
+            $('#user-input').val('');
+
+            // call your Flask /get route
+            $.post('/get', { msg: msg })
+                .done(function (data) {
+                    $('#chat-box').append(
+                        '<div class="bot-msg"><strong>FinChat Pro:</strong> ' +
+                        $('<div>').text(data).html() + '</div>'
+                    );
+                    // scroll to bottom
+                    const box = document.getElementById('chat-box');
+                    box.scrollTop = box.scrollHeight;
+                })
+                .fail(function () {
+                    $('#chat-box').append(
+                        '<div class="bot-msg"><strong>FinChat Pro:</strong> Sorry, something went wrong.</div>'
+                    );
+                });
+        }
+    </script>
+</body>
+</html>

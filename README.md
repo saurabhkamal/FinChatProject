@@ -22,4 +22,5 @@ pip install -r requirements.txt
 ```
 
 
+https://stockanalysis.com/stocks/goog/financials/
 
